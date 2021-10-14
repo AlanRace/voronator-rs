@@ -48,12 +48,6 @@ fn issue_13() {
 
 
 #[test]
-fn trait_test() {
-    let point = Point::from_xy(1.0, 1.0);
-    println!("{:?}", Point::vector(&point, &point));
-}
-
-#[test]
 fn duplicated_points() {
     use std::collections::HashSet;
     let points = [(2520.0, 856.0), (794.0, 66.0), (974.0, 446.0)];

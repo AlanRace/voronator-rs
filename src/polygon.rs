@@ -38,6 +38,58 @@ impl<C: Coord> Polygon<C> {
     pub fn points(&self) -> &[C] {
         &self.points
     }
+
+    /// Return area of polygon.
+    pub fn area(&self) -> Option<f64> {
+        match self.points.len() {
+            0 => None,
+            1 => Some(0.0),
+            _ => {
+                let mut area_sum_double = 0.0;
+
+                for i in 0..self.points.len()-1 {
+                    area_sum_double += triangle_area2(&self.points[0], &self.points[i], &self.points[i+1]);
+                }
+
+                Some(area_sum_double / 2.0)
+            }
+        }
+    }
+
+    /// Return the centroid of polygon.
+    pub fn centroid(&self) -> Option<C> {
+        match self.points.len() {
+            0 => None,
+            1 => Some(self.points[0].clone()),
+            _ => {
+                let mut x = 0.0;
+                let mut y = 0.0;
+                let mut area_sum_double = 0.0;
+
+                for i in 0..self.points.len()-1 {
+                    let triangle_cent3 = triangle_centroid3(&self.points[0], &self.points[i], &self.points[i+1]);
+                    let area_squared = triangle_area2(&self.points[0], &self.points[i], &self.points[i+1]);
+
+                    x += area_squared * triangle_cent3.x();
+                    y += area_squared * triangle_cent3.y();
+
+                    area_sum_double += area_squared
+                }
+
+                Some(C::from_xy(x / 3.0 / area_sum_double, y / 3.0 / area_sum_double))
+            }
+        }
+    }
+
+}
+
+fn triangle_centroid3<C: Coord>(p1: &C, p2: &C, p3: &C) -> C {
+    C::from_xy(p1.x() + p2.x() + p3.x(), p1.y() + p2.y() + p3.y())
+}
+
+fn triangle_area2<C: Coord>(p1: &C, p2: &C, p3: &C) -> f64 {
+	(p2.x()-p1.x())*(p3.y()-p1.y()) -
+		(p3.x()-p1.x())*(p2.y()-p1.y())
 }
 
 fn inside<C: Coord>(p: &C, p1: &C, p2: &C) -> bool {

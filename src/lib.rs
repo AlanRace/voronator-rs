@@ -92,7 +92,7 @@ use crate::delaunator::*;
 use crate::polygon::*;
 
 /// Represents a centroidal tesselation diagram.
-pub struct CentroidDiagram<C: Coord + Vector<C>> {
+pub struct CentroidDiagram<C: Coord> {
     /// Contains the input data
     pub sites: Vec<C>,
     /// A [`Triangulation`] struct that contains the Delaunay triangulation information.
@@ -107,7 +107,7 @@ pub struct CentroidDiagram<C: Coord + Vector<C>> {
     pub neighbors: Vec<Vec<usize>>,
 }
 
-impl<C: Coord + Vector<C>> CentroidDiagram<C> {
+impl<C: Coord> CentroidDiagram<C> {
     /// Creates a centroidal tesselation, if it exists, for a given set of points.
     ///
     /// Points are represented here as a `delaunator::Point`.
@@ -186,7 +186,7 @@ fn helper_points<C: Coord>(polygon: &Polygon<C>) -> Vec<C> {
 }
 
 /// Represents a Voronoi diagram.
-pub struct VoronoiDiagram<C: Coord + Vector<C>> {
+pub struct VoronoiDiagram<C: Coord> {
     /// Contains the input data
     pub sites: Vec<C>,
     /// A [`Triangulation`] struct that contains the Delaunay triangulation information.
@@ -203,7 +203,7 @@ pub struct VoronoiDiagram<C: Coord + Vector<C>> {
     num_helper_points: usize,
 }
 
-impl<C: Coord + Vector<C>> VoronoiDiagram<C> {
+impl<C: Coord> VoronoiDiagram<C> {
     /// Creates a Voronoi diagram, if it exists, for a given set of points.
     ///
     /// Points are represented here as anything that implements [`delaunator::Coord` and `delaunator::Vector<Coord>`].
@@ -287,7 +287,7 @@ impl<C: Coord + Vector<C>> VoronoiDiagram<C> {
     }
 }
 
-fn calculate_centroids<C: Coord + Vector<C>>(points: &[C], delaunay: &Triangulation) -> Vec<C> {
+fn calculate_centroids<C: Coord>(points: &[C], delaunay: &Triangulation) -> Vec<C> {
     let num_triangles = delaunay.len();
     let mut centroids = Vec::with_capacity(num_triangles);
     for t in 0..num_triangles {
@@ -306,7 +306,7 @@ fn calculate_centroids<C: Coord + Vector<C>>(points: &[C], delaunay: &Triangulat
     centroids
 }
 
-fn calculate_circumcenters<C: Coord + Vector<C>>(points: &[C], delaunay: &Triangulation) -> Vec<C> {
+fn calculate_circumcenters<C: Coord>(points: &[C], delaunay: &Triangulation) -> Vec<C> {
     (0..delaunay.len()).into_par_iter().map(|t| {
         let v: Vec<C> = points_of_triangle(t, delaunay)
         .into_iter()
@@ -320,7 +320,7 @@ fn calculate_circumcenters<C: Coord + Vector<C>>(points: &[C], delaunay: &Triang
     }).collect()
 }
 
-fn calculate_neighbors<C: Coord + Vector<C>>(points: &[C], delaunay: &Triangulation) -> Vec<Vec<usize>> {
+fn calculate_neighbors<C: Coord>(points: &[C], delaunay: &Triangulation) -> Vec<Vec<usize>> {
     points.par_iter().enumerate().map(|(t, _point)| {
         let mut neighbours: Vec<usize> = vec![];
 
