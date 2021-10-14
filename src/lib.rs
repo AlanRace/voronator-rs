@@ -307,13 +307,17 @@ fn calculate_centroids<C: Coord>(points: &[C], delaunay: &Triangulation) -> Vec<
 }
 
 fn calculate_circumcenters<C: Coord>(points: &[C], delaunay: &Triangulation) -> Vec<C> {
-    (0..delaunay.len()).into_par_iter().map(|t| {
-        let v: Vec<C> = points_of_triangle(t, delaunay)
-        .into_iter()
-        .map(|p| points[p].clone())
-        .collect();
+    // Preallocate memory as we are dealing with fixed sizes
+    let mut triangle: [usize; 3] = [0; 3];
+    let mut triangle_points: [&C; 3] = [&points[0]; 3];
 
-        match circumcenter(&v[0], &v[1], &v[2]) {
+    (0..delaunay.len()).into_iter().map(|t| {
+        points_of_triangle(&mut triangle, t, delaunay);
+        triangle_points[0] = &points[triangle[0]];
+        triangle_points[1] = &points[triangle[1]];
+        triangle_points[2] = &points[triangle[2]];
+
+        match circumcenter(triangle_points[0], triangle_points[1], triangle_points[2]) {
             Some(c) => c,
             None => C::from_xy(0., 0.)
         }

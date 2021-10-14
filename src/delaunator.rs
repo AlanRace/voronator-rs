@@ -108,32 +108,38 @@ pub trait Coord: Sync + Send + Clone {
     fn magnitude2(&self) -> f64 {
         self.x() * self.x() + self.y() * self.y()
     }
+
+    #[inline]
+    /// Subtract coordinate `q` from this coordinate.
+    fn sub(&self, q: &impl Coord) -> Self {
+        Self::from_xy(self.x() - q.x(), self.y() - q.y())
+    }
 }
 
-#[inline(always)]
+#[inline]
 fn vector<C: Coord>(p: &C, q: &C) -> C {
     C::from_xy(q.x() - p.x(), q.y() - p.y())
 }
 
-#[inline(always)]
+#[inline]
 fn determinant<C: Coord>(p: &C, q: &C) -> f64 {
     p.x() * q.y() - p.y() * q.x()
 }
 
-#[inline(always)]
+#[inline]
 fn dist2<C: Coord>(p: &C, q: &C) -> f64 {
-    let d = vector(p, q);
+    let d = p.sub(q);//vector(p, q);
 
     d.x() * d.x() + d.y() * d.y()
 }
 
 /// Test whether two coordinates describe the same point in space
-#[inline(always)]
+#[inline]
 fn equals<C: Coord>(p: &C, q: &C) -> bool {
     (p.x() - q.x()).abs() <= EPSILON && (p.y() - q.y()).abs() <= EPSILON
 }
 
-#[inline(always)]
+#[inline]
 fn equals_with_span<C: Coord>(p: &C, q: &C, span: f64) -> bool {
     let dist = dist2(p, q) / span;
     dist < 1e-20 // dunno about this
@@ -320,9 +326,12 @@ pub fn triangle_of_edge(e: usize) -> usize {
 /// * `t` - The triangle index
 /// * `delaunay` - A reference to a fully constructed Triangulation
 #[inline]
-pub fn points_of_triangle(t: usize, delaunay: &Triangulation) -> Vec<usize> {
+pub fn points_of_triangle(triangle: &mut [usize; 3], t: usize, delaunay: &Triangulation) {
     let edges = edges_of_triangle(t);
-    edges.iter().map(|&e| delaunay.triangles[e]).collect()
+    triangle[0] = delaunay.triangles[edges[0]];
+    triangle[1] = delaunay.triangles[edges[1]];
+    triangle[2] = delaunay.triangles[edges[2]];
+    //edges.iter().map(|&e| delaunay.triangles[e]).collect()
 }
 
 /// Returns a vec containing the indices for the adjacent triangles of the given triangle
@@ -388,6 +397,8 @@ pub struct Triangulation {
     ///
     /// [`voronator`]: ../index.html
     pub outedges: Vec<usize>,
+
+    edge_stack: Vec<usize>,
 }
 
 impl Triangulation {
@@ -399,6 +410,7 @@ impl Triangulation {
             hull: Vec::new(),
             inedges: vec![INVALID_INDEX; n],
             outedges: vec![INVALID_INDEX; n],
+            edge_stack: Vec::new(),
         }
     }
 
@@ -433,7 +445,7 @@ impl Triangulation {
         let mut ar;
         let mut a = p;
 
-        let mut edge_stack: Vec<usize> = Vec::new();
+        self.edge_stack.clear();
 
         loop {
             let b = self.halfedges[a];
@@ -442,7 +454,7 @@ impl Triangulation {
             if b == INVALID_INDEX {
                 if i > 0 {
                     i -= 1;
-                    a = edge_stack[i];
+                    a = self.edge_stack[i];
                     continue;
                 } else {
                     break;
@@ -488,16 +500,16 @@ impl Triangulation {
 
                 let br = next_halfedge(b);
 
-                if i < edge_stack.len() {
-                    edge_stack[i] = br;
+                if i < self.edge_stack.len() {
+                    self.edge_stack[i] = br;
                 } else {
-                    edge_stack.push(br);
+                    self.edge_stack.push(br);
                 }
 
                 i += 1;
             } else if i > 0 {
                 i -= 1;
-                a = edge_stack[i];
+                a = self.edge_stack[i];
                 continue;
             } else {
                 break;
