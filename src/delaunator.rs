@@ -326,12 +326,15 @@ pub fn triangle_of_edge(e: usize) -> usize {
 /// * `t` - The triangle index
 /// * `delaunay` - A reference to a fully constructed Triangulation
 #[inline]
-pub fn points_of_triangle(triangle: &mut [usize; 3], t: usize, delaunay: &Triangulation) {
+pub fn points_of_triangle( t: usize, delaunay: &Triangulation) -> [usize; 3] {
+    let mut triangle: [usize; 3] = [0; 3];
     let edges = edges_of_triangle(t);
     triangle[0] = delaunay.triangles[edges[0]];
     triangle[1] = delaunay.triangles[edges[1]];
     triangle[2] = delaunay.triangles[edges[2]];
     //edges.iter().map(|&e| delaunay.triangles[e]).collect()
+    
+    triangle
 }
 
 /// Returns a vec containing the indices for the adjacent triangles of the given triangle
