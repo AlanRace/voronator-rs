@@ -108,12 +108,6 @@ pub trait Coord: Sync + Send + Clone {
     fn magnitude2(&self) -> f64 {
         self.x() * self.x() + self.y() * self.y()
     }
-
-    #[inline]
-    /// Subtract coordinate `q` from this coordinate.
-    fn sub(&self, q: &impl Coord) -> Self {
-        Self::from_xy(self.x() - q.x(), self.y() - q.y())
-    }
 }
 
 #[inline]
@@ -128,7 +122,7 @@ fn determinant<C: Coord>(p: &C, q: &C) -> f64 {
 
 #[inline]
 fn dist2<C: Coord>(p: &C, q: &C) -> f64 {
-    let d = p.sub(q);//vector(p, q);
+    let d = vector(p, q);
 
     d.x() * d.x() + d.y() * d.y()
 }
@@ -183,6 +177,7 @@ impl From<(f64, f64)> for Point {
     }
 }
 
+#[inline]
 fn in_circle<C: Coord>(p: &C, a: &C, b: &C, c: &C) -> bool {
     let d = vector(p, a);
     let e = vector(p, b);
@@ -201,6 +196,7 @@ fn in_circle<C: Coord>(p: &C, a: &C, b: &C, c: &C) -> bool {
 }
 
 #[rustfmt::skip]
+#[inline]
 fn circumradius<C: Coord>(a: &C, b: &C, c: &C) -> f64 {
     let d = vector(a, b);
     let e = vector(a, c);
@@ -220,6 +216,7 @@ fn circumradius<C: Coord>(a: &C, b: &C, c: &C) -> f64 {
         f64::MAX
     }
 }
+
 
 /// Calculates the circumcenter of a triangle, given it's three vertices
 ///
@@ -333,7 +330,7 @@ pub fn points_of_triangle( t: usize, delaunay: &Triangulation) -> [usize; 3] {
     triangle[1] = delaunay.triangles[edges[1]];
     triangle[2] = delaunay.triangles[edges[2]];
     //edges.iter().map(|&e| delaunay.triangles[e]).collect()
-    
+
     triangle
 }
 
@@ -604,7 +601,7 @@ struct Hull<C: Coord> {
 }
 
 impl<C: Coord> Hull<C> {
-    fn new(n: usize, center: &C, i0: usize, i1: usize, i2: usize, points: &[C]) -> Self {
+    fn new(n: usize, center: C, i0: usize, i1: usize, i2: usize, points: &[C]) -> Self {
         // initialize a hash table for storing edges of the advancing convex hull
         let hash_len = (n as f64).sqrt().ceil() as usize;
 
@@ -614,7 +611,7 @@ impl<C: Coord> Hull<C> {
             tri: vec![0; n],
             hash: vec![INVALID_INDEX; hash_len],
             start: i0,
-            center: center.clone(),
+            center: center,
         };
 
         hull.next[i0] = i1;
@@ -657,6 +654,7 @@ impl<C: Coord> Hull<C> {
         // find a visible edge on the convex hull using edge hash
         let mut start = 0;
         let key = self.hash_key(p);
+        
         for j in 0..self.hash.len() {
             let index = fast_mod(key + j, self.hash.len());
             start = self.hash[index];
@@ -753,7 +751,7 @@ fn find_seed_triangle<C: Coord>(
     let i0 = find_closest_point(points, center);
     let p0 = &points[i0];
 
-    let mut i1 = find_closest_point(points, p0);
+    let i1 = find_closest_point(points, p0);
     let p1 = &points[i1];
 
     // find the third point which forms the smallest circumcircle
@@ -774,13 +772,10 @@ fn find_seed_triangle<C: Coord>(
     if min_radius == f64::MAX {
         None
     } else {
-        let p2 = &points[i2];
-
-        if counter_clockwise(p0, p1, p2) {
-            std::mem::swap(&mut i1, &mut i2)
+        match counter_clockwise(p0, p1, &points[i2]) {
+            true => Some((i0, i2, i1)),
+            false =>  Some((i0, i1, i2))
         }
-
-        Some((i0, i1, i2))
     }
 }
 
@@ -874,7 +869,7 @@ pub fn triangulate<C: Coord>(points: &[C]) -> Option<Triangulation> {
     dists.sort_unstable_by(|(_, a), (_, b)| a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Less));
 
     //eprintln!("creating hull...");
-    let mut hull = Hull::new(points.len(), &center, i0, i1, i2, points);
+    let mut hull = Hull::new(points.len(), center, i0, i1, i2, points);
 
     //eprintln!("calculating triangulation...");
     let mut triangulation = Triangulation::new(points.len());

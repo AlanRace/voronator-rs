@@ -60,7 +60,7 @@ impl<C: Coord> Polygon<C> {
     pub fn centroid(&self) -> Option<C> {
         match self.points.len() {
             0 => None,
-            1 => Some(self.points[0].clone()),
+            1 => Some(C::from_xy(self.points[0].x(), self.points[1].y())),
             _ => {
                 let mut x = 0.0;
                 let mut y = 0.0;
