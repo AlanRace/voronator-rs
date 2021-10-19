@@ -46,12 +46,12 @@ fn issue_13() {
     validate(&points);
 }
 
-
 #[test]
 fn duplicated_points() {
     use std::collections::HashSet;
     let points = [(2520.0, 856.0), (794.0, 66.0), (974.0, 446.0)];
-    let voronoi = VoronoiDiagram::<Point>::from_tuple(&(0.0, 0.0), &(2560.0, 2560.0), &points).unwrap();
+    let voronoi =
+        VoronoiDiagram::<Point>::from_tuple(&(0.0, 0.0), &(2560.0, 2560.0), &points).unwrap();
 
     println!("# cells: {}", voronoi.cells().len());
     for polygon in voronoi.cells() {
@@ -74,7 +74,6 @@ fn duplicated_points() {
 
         assert!(expected == actual)
     }
-
 }
 
 #[test]
@@ -197,8 +196,9 @@ fn hull_area(points: &[Point], delaunay: &Triangulation) -> f64 {
 fn better_sum(x: &[f64]) -> f64 {
     let mut sum = x[0];
     let mut err: f64 = 0.0;
-    for i in 1..x.len() {
-        let k = x[i];
+    //for i in 1..x.len() {
+    for k in &x[1..] {
+        //let k = x[i];
         let m = sum + k;
         err += if sum.abs() >= k.abs() {
             sum - m + k
@@ -211,7 +211,7 @@ fn better_sum(x: &[f64]) -> f64 {
 }
 
 fn validate(points: &[Point]) {
-    let triangulation = triangulate(&points).expect("No triangulation exists for this input");
+    let triangulation = triangulate(points).expect("No triangulation exists for this input");
 
     // validate halfedges
     for (i, &h) in triangulation.halfedges.iter().enumerate() {

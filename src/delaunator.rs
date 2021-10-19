@@ -217,7 +217,6 @@ fn circumradius<C: Coord>(a: &C, b: &C, c: &C) -> f64 {
     }
 }
 
-
 /// Calculates the circumcenter of a triangle, given it's three vertices
 ///
 /// # Arguments
@@ -323,7 +322,7 @@ pub fn triangle_of_edge(e: usize) -> usize {
 /// * `t` - The triangle index
 /// * `delaunay` - A reference to a fully constructed Triangulation
 #[inline]
-pub fn points_of_triangle( t: usize, delaunay: &Triangulation) -> [usize; 3] {
+pub fn points_of_triangle(t: usize, delaunay: &Triangulation) -> [usize; 3] {
     let mut triangle: [usize; 3] = [0; 3];
     let edges = edges_of_triangle(t);
     triangle[0] = delaunay.triangles[edges[0]];
@@ -420,12 +419,7 @@ impl Triangulation {
         self.triangles.len() / 3
     }
 
-    fn legalize<C: Coord>(
-        &mut self,
-        p: usize,
-        points: &[C],
-        hull: &mut Hull<C>,
-    ) -> usize {
+    fn legalize<C: Coord>(&mut self, p: usize, points: &[C], hull: &mut Hull<C>) -> usize {
         /* if the pair of triangles doesn't satisfy the Delaunay condition
          * (p1 is inside the circumcircle of [p0, pl, pr]), flip them,
          * then do the same check/flip recursively for the new pair of triangles
@@ -522,25 +516,37 @@ impl Triangulation {
     fn link(&mut self, a: usize, b: usize) {
         let s: usize = self.halfedges.len();
 
-        if a == s {
+        match a.cmp(&s) {
+            std::cmp::Ordering::Equal => self.halfedges.push(b),
+            std::cmp::Ordering::Less => self.halfedges[a] = b,
+            _ => panic!("Cannot link edge"),
+        }
+
+        /*if a == s {
             self.halfedges.push(b);
         } else if a < s {
             self.halfedges[a] = b;
         } else {
             // todo: fix hard error, make it recoverable or graceful
             panic!("Cannot link edge")
-        }
+        }*/
 
         if b != INVALID_INDEX {
             let s2: usize = self.halfedges.len();
-            if b == s2 {
+
+            match b.cmp(&s2) {
+                std::cmp::Ordering::Equal => self.halfedges.push(a),
+                std::cmp::Ordering::Less => self.halfedges[b] = a,
+                _ => panic!("Cannot link edge"),
+            }
+            /*if b == s2 {
                 self.halfedges.push(a);
             } else if b < s2 {
                 self.halfedges[b] = a;
             } else {
                 // todo: fix hard error, make it recoverable or graceful
                 panic!("Cannot link edge")
-            }
+            }*/
         }
     }
 
@@ -611,7 +617,7 @@ impl<C: Coord> Hull<C> {
             tri: vec![0; n],
             hash: vec![INVALID_INDEX; hash_len],
             start: i0,
-            center: center,
+            center,
         };
 
         hull.next[i0] = i1;
@@ -654,7 +660,7 @@ impl<C: Coord> Hull<C> {
         // find a visible edge on the convex hull using edge hash
         let mut start = 0;
         let key = self.hash_key(p);
-        
+
         for j in 0..self.hash.len() {
             let index = fast_mod(key + j, self.hash.len());
             start = self.hash[index];
@@ -680,8 +686,7 @@ impl<C: Coord> Hull<C> {
         loop {
             q = self.next[e];
             // eprintln!("p: {:?}, e: {:?}, q: {:?}", p, &points[e], &points[q]);
-            if equals_with_span(p, &points[e], span) || equals_with_span(p, &points[q], span)
-            {
+            if equals_with_span(p, &points[e], span) || equals_with_span(p, &points[q], span) {
                 e = INVALID_INDEX;
                 break;
             }
@@ -744,10 +749,7 @@ fn find_closest_point<C: Coord>(points: &[C], p: &C) -> usize {
     k
 }
 
-fn find_seed_triangle<C: Coord>(
-    center: &C,
-    points: &[C],
-) -> Option<(usize, usize, usize)> {
+fn find_seed_triangle<C: Coord>(center: &C, points: &[C]) -> Option<(usize, usize, usize)> {
     let i0 = find_closest_point(points, center);
     let p0 = &points[i0];
 
@@ -774,7 +776,7 @@ fn find_seed_triangle<C: Coord>(
     } else {
         match counter_clockwise(p0, p1, &points[i2]) {
             true => Some((i0, i2, i1)),
-            false =>  Some((i0, i1, i2))
+            false => Some((i0, i1, i2)),
         }
     }
 }
@@ -798,9 +800,7 @@ fn to_points<C: Coord>(coords: &[f64]) -> Vec<C> {
 ///
 /// * `coords` - A vector of `f64` of size `2n`, where for each point `i`, `x = 2i`
 /// and y = `2i + 1`.
-pub fn triangulate_from_arr<C: Coord>(
-    coords: &[f64],
-) -> Option<(Triangulation, Vec<C>)> {
+pub fn triangulate_from_arr<C: Coord>(coords: &[f64]) -> Option<(Triangulation, Vec<C>)> {
     let n = coords.len();
 
     if n % 2 != 0 {
@@ -823,9 +823,7 @@ pub fn triangulate_from_arr<C: Coord>(
 /// # Arguments
 ///
 /// * `coords` - A vector of tuples, where each tuple is a `(f64, f64)`
-pub fn triangulate_from_tuple<C: Coord>(
-    coords: &[(f64, f64)],
-) -> Option<(Triangulation, Vec<C>)> {
+pub fn triangulate_from_tuple<C: Coord>(coords: &[(f64, f64)]) -> Option<(Triangulation, Vec<C>)> {
     let points: Vec<C> = coords.iter().map(|p| C::from_xy(p.0, p.1)).collect();
 
     let triangulation = triangulate(&points)?;
@@ -847,7 +845,7 @@ pub fn triangulate<C: Coord>(points: &[C]) -> Option<Triangulation> {
 
     //eprintln!("calculating bbox and seeds...");
     let (center_bbox, span) = calculate_bbox_center(points);
-    let (i0, i1, i2) = find_seed_triangle(&center_bbox, &points)?;
+    let (i0, i1, i2) = find_seed_triangle(&center_bbox, points)?;
 
     let p0 = &points[i0];
     let p1 = &points[i1];
@@ -866,7 +864,7 @@ pub fn triangulate<C: Coord>(points: &[C]) -> Option<Triangulation> {
         .collect();
 
     // sort the points by distance from the seed triangle circumcenter
-    dists.sort_unstable_by(|(_, a), (_, b)| a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Less));
+    dists.sort_unstable_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Less));
 
     //eprintln!("creating hull...");
     let mut hull = Hull::new(points.len(), center, i0, i1, i2, points);

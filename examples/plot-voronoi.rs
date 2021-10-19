@@ -74,7 +74,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // }
 
     for cell in diagram.cells() {
-        let p: Vec<(f32, f32)> = cell.points().into_iter().map(|x| (x.x as f32, x.y as f32)).collect();
+        let p: Vec<(f32, f32)> = cell
+            .points()
+            .iter()
+            .map(|x| (x.x as f32, x.y as f32))
+            .collect();
 
         for _ in 0..p.len() {
             let plot = PathElement::new(

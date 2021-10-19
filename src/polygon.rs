@@ -1,12 +1,12 @@
 //! Provides functions for handling polygons.
 //!
 //! Polygons are stored as a Vec<Point>
-//! 
+//!
 //! # Example
 //!
 //! ```no_run
 //! extern crate voronator;
-//! 
+//!
 //! use voronator::delaunator::Point;
 //! use voronator::polygon::Polygon;
 //!
@@ -21,6 +21,12 @@ use crate::delaunator::Coord;
 /// Represents a polygon.
 pub struct Polygon<C: Coord> {
     pub(crate) points: Vec<C>,
+}
+
+impl<C: Coord> Default for Polygon<C> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<C: Coord> Polygon<C> {
@@ -47,8 +53,9 @@ impl<C: Coord> Polygon<C> {
             _ => {
                 let mut area_sum_double = 0.0;
 
-                for i in 0..self.points.len()-1 {
-                    area_sum_double += triangle_area2(&self.points[0], &self.points[i], &self.points[i+1]);
+                for i in 0..self.points.len() - 1 {
+                    area_sum_double +=
+                        triangle_area2(&self.points[0], &self.points[i], &self.points[i + 1]);
                 }
 
                 Some(area_sum_double / 2.0)
@@ -66,9 +73,11 @@ impl<C: Coord> Polygon<C> {
                 let mut y = 0.0;
                 let mut area_sum_double = 0.0;
 
-                for i in 0..self.points.len()-1 {
-                    let triangle_cent3 = triangle_centroid3(&self.points[0], &self.points[i], &self.points[i+1]);
-                    let area_squared = triangle_area2(&self.points[0], &self.points[i], &self.points[i+1]);
+                for i in 0..self.points.len() - 1 {
+                    let triangle_cent3 =
+                        triangle_centroid3(&self.points[0], &self.points[i], &self.points[i + 1]);
+                    let area_squared =
+                        triangle_area2(&self.points[0], &self.points[i], &self.points[i + 1]);
 
                     x += area_squared * triangle_cent3.x();
                     y += area_squared * triangle_cent3.y();
@@ -76,11 +85,13 @@ impl<C: Coord> Polygon<C> {
                     area_sum_double += area_squared
                 }
 
-                Some(C::from_xy(x / 3.0 / area_sum_double, y / 3.0 / area_sum_double))
+                Some(C::from_xy(
+                    x / 3.0 / area_sum_double,
+                    y / 3.0 / area_sum_double,
+                ))
             }
         }
     }
-
 }
 
 fn triangle_centroid3<C: Coord>(p1: &C, p2: &C, p3: &C) -> C {
@@ -88,23 +99,17 @@ fn triangle_centroid3<C: Coord>(p1: &C, p2: &C, p3: &C) -> C {
 }
 
 fn triangle_area2<C: Coord>(p1: &C, p2: &C, p3: &C) -> f64 {
-	(p2.x()-p1.x())*(p3.y()-p1.y()) -
-		(p3.x()-p1.x())*(p2.y()-p1.y())
+    (p2.x() - p1.x()) * (p3.y() - p1.y()) - (p3.x() - p1.x()) * (p2.y() - p1.y())
 }
 
 fn inside<C: Coord>(p: &C, p1: &C, p2: &C) -> bool {
-    (p2.y() - p1.y()) * p.x() + (p1.x() - p2.x()) * p.y() + (p2.x() * p1.y() - p1.x() * p2.y()) < 0.0
+    (p2.y() - p1.y()) * p.x() + (p1.x() - p2.x()) * p.y() + (p2.x() * p1.y() - p1.x() * p2.y())
+        < 0.0
 }
 
 fn intersection<C: Coord>(cp1: &C, cp2: &C, s: &C, e: &C) -> C {
-    let dc = C::from_xy(
-        cp1.x() - cp2.x(),
-        cp1.y() - cp2.y(),
-    );
-    let dp = C::from_xy(
-        s.x() - e.x(),
-        s.y() - e.y(),
-    );
+    let dc = C::from_xy(cp1.x() - cp2.x(), cp1.y() - cp2.y());
+    let dp = C::from_xy(s.x() - e.x(), s.y() - e.y());
 
     let n1 = cp1.x() * cp2.y() - cp1.y() * cp2.x();
     let n2 = s.x() * e.y() - s.y() * e.x();
