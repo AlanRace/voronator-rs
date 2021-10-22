@@ -17,19 +17,32 @@
 //!
 
 use crate::delaunator::Coord;
+use num::{Float, NumCast, Zero};
 
 /// Represents a polygon.
-pub struct Polygon<C: Coord> {
+pub struct Polygon<C>
+where
+    //F: Float + Sync + Send,
+    C: Coord,
+{
     pub(crate) points: Vec<C>,
 }
 
-impl<C: Coord> Default for Polygon<C> {
+impl<C> Default for Polygon<C>
+where
+    //F: Float + Sync + Send,
+    C: Coord,
+{
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<C: Coord> Polygon<C> {
+impl<C> Polygon<C>
+where
+    //F: Float + Sync + Send,
+    C: Coord,
+{
     /// Create an empty polygon with no points.
     pub fn new() -> Self {
         Polygon { points: Vec::new() }
@@ -46,19 +59,19 @@ impl<C: Coord> Polygon<C> {
     }
 
     /// Return area of polygon.
-    pub fn area(&self) -> Option<f64> {
+    pub fn area(&self) -> Option<C::F> {
         match self.points.len() {
             0 => None,
-            1 => Some(0.0),
+            1 => Some(C::F::zero()),
             _ => {
-                let mut area_sum_double = 0.0;
+                let mut area_sum_double: C::F = C::F::zero();
 
                 for i in 0..self.points.len() - 1 {
-                    area_sum_double +=
-                        triangle_area2(&self.points[0], &self.points[i], &self.points[i + 1]);
+                    area_sum_double = area_sum_double
+                        + triangle_area2(&self.points[0], &self.points[i], &self.points[i + 1]);
                 }
 
-                Some(area_sum_double / 2.0)
+                Some(area_sum_double / num::cast(2.0).unwrap())
             }
         }
     }
@@ -67,11 +80,11 @@ impl<C: Coord> Polygon<C> {
     pub fn centroid(&self) -> Option<C> {
         match self.points.len() {
             0 => None,
-            1 => Some(C::from_xy(self.points[0].x(), self.points[1].y())),
+            1 => Some(C::from_xy(self.points[0].x(), self.points[0].y())),
             _ => {
-                let mut x = 0.0;
-                let mut y = 0.0;
-                let mut area_sum_double = 0.0;
+                let mut x: C::F = C::F::zero();
+                let mut y: C::F = C::F::zero();
+                let mut area_sum_double: C::F = C::F::zero();
 
                 for i in 0..self.points.len() - 1 {
                     let triangle_cent3 =
@@ -79,15 +92,15 @@ impl<C: Coord> Polygon<C> {
                     let area_squared =
                         triangle_area2(&self.points[0], &self.points[i], &self.points[i + 1]);
 
-                    x += area_squared * triangle_cent3.x();
-                    y += area_squared * triangle_cent3.y();
+                    x = x + (area_squared * triangle_cent3.x());
+                    y = y + (area_squared * triangle_cent3.y());
 
-                    area_sum_double += area_squared
+                    area_sum_double = area_sum_double + area_squared
                 }
 
                 Some(C::from_xy(
-                    x / 3.0 / area_sum_double,
-                    y / 3.0 / area_sum_double,
+                    x / num::cast(3.0).unwrap() / area_sum_double,
+                    y / num::cast(3.0).unwrap() / area_sum_double,
                 ))
             }
         }
@@ -98,13 +111,13 @@ fn triangle_centroid3<C: Coord>(p1: &C, p2: &C, p3: &C) -> C {
     C::from_xy(p1.x() + p2.x() + p3.x(), p1.y() + p2.y() + p3.y())
 }
 
-fn triangle_area2<C: Coord>(p1: &C, p2: &C, p3: &C) -> f64 {
+fn triangle_area2<C: Coord>(p1: &C, p2: &C, p3: &C) -> C::F {
     (p2.x() - p1.x()) * (p3.y() - p1.y()) - (p3.x() - p1.x()) * (p2.y() - p1.y())
 }
 
 fn inside<C: Coord>(p: &C, p1: &C, p2: &C) -> bool {
     (p2.y() - p1.y()) * p.x() + (p1.x() - p2.x()) * p.y() + (p2.x() * p1.y() - p1.x() * p2.y())
-        < 0.0
+        < C::F::zero()
 }
 
 fn intersection<C: Coord>(cp1: &C, cp2: &C, s: &C, e: &C) -> C {
@@ -114,7 +127,9 @@ fn intersection<C: Coord>(cp1: &C, cp2: &C, s: &C, e: &C) -> C {
     let n1 = cp1.x() * cp2.y() - cp1.y() * cp2.x();
     let n2 = s.x() * e.y() - s.y() * e.x();
 
-    let n3 = 1.0 / (dc.x() * dp.y() - dc.y() * dp.x());
+    let one: C::F = num::cast(1.0).unwrap();
+
+    let n3 = one / (dc.x() * dp.y() - dc.y() * dp.x());
 
     C::from_xy(
         (n1 * dp.x() - n2 * dc.x()) * n3,
@@ -123,7 +138,11 @@ fn intersection<C: Coord>(cp1: &C, cp2: &C, s: &C, e: &C) -> C {
 }
 
 /// Sutherland-Hodgman clipping modified from https://rosettacode.org/wiki/Sutherland-Hodgman_polygon_clipping#C.2B.2B
-pub fn sutherland_hodgman<C: Coord + Clone>(subject: &Polygon<C>, clip: &Polygon<C>) -> Polygon<C> {
+pub fn sutherland_hodgman<F, C>(subject: &Polygon<C>, clip: &Polygon<C>) -> Polygon<C>
+where
+    //    F: Float + Sync + Send,
+    C: Coord,
+{
     let mut output_polygon = Polygon::new();
     let mut input_polygon = Polygon::new();
 

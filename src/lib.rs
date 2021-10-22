@@ -84,6 +84,7 @@
 pub mod delaunator;
 pub mod polygon;
 
+use num::{Float, NumCast, Zero};
 use rayon::prelude::*;
 
 use std::{f64, usize};
@@ -92,7 +93,11 @@ use crate::delaunator::*;
 use crate::polygon::*;
 
 /// Represents a centroidal tesselation diagram.
-pub struct CentroidDiagram<C: Coord> {
+pub struct CentroidDiagram<C>
+where
+    //F: Float + Sync + Send,
+    C: Coord,
+{
     /// Contains the input data
     pub sites: Vec<C>,
     /// A [`Triangulation`] struct that contains the Delaunay triangulation information.
@@ -107,7 +112,11 @@ pub struct CentroidDiagram<C: Coord> {
     pub neighbors: Vec<Vec<usize>>,
 }
 
-impl<C: Coord> CentroidDiagram<C> {
+impl<C> CentroidDiagram<C>
+where
+    //F: Float + Sync + Send,
+    C: Coord,
+{
     /// Creates a centroidal tesselation, if it exists, for a given set of points.
     ///
     /// Points are represented here as a `delaunator::Point`.
@@ -128,7 +137,7 @@ impl<C: Coord> CentroidDiagram<C> {
     /// Creates a centroidal tesselation, if it exists, for a given set of points.
     ///
     /// Points are represented here as a `(f64, f64)` tuple.
-    pub fn from_tuple(coords: &[(f64, f64)]) -> Option<Self> {
+    pub fn from_tuple(coords: &[(C::F, C::F)]) -> Option<Self> {
         let points: Vec<C> = coords.iter().map(|p| C::from_xy(p.0, p.1)).collect();
         CentroidDiagram::new(&points)
     }
@@ -153,16 +162,20 @@ impl<C: Coord> CentroidDiagram<C> {
     }
 }
 
-fn helper_points<C: Coord>(polygon: &Polygon<C>) -> Vec<C> {
+fn helper_points<C>(polygon: &Polygon<C>) -> Vec<C>
+where
+    //F: Float + Sync + Send,
+    C: Coord,
+{
     let mut points = vec![];
 
     let mut min = Point {
-        x: f64::MAX,
-        y: f64::MAX,
+        x: C::F::max_value(),
+        y: C::F::max_value(),
     };
     let mut max = Point {
-        x: f64::MIN,
-        y: f64::MIN,
+        x: C::F::min_value(),
+        y: C::F::min_value(),
     };
 
     for point in polygon.points() {
@@ -183,10 +196,12 @@ fn helper_points<C: Coord>(polygon: &Polygon<C>) -> Vec<C> {
     let width = max.x() - min.x();
     let height = max.y() - min.y();
 
-    points.push(C::from_xy(min.x() - width, min.y() + height / 2.0));
-    points.push(C::from_xy(max.x() + width, min.y() + height / 2.0));
-    points.push(C::from_xy(min.x() + width / 2.0, min.y() - height));
-    points.push(C::from_xy(min.x() + width / 2.0, max.y() + height));
+    let two = num::cast(2.0).unwrap();
+
+    points.push(C::from_xy(min.x() - width, min.y() + height / two));
+    points.push(C::from_xy(max.x() + width, min.y() + height / two));
+    points.push(C::from_xy(min.x() + width / two, min.y() - height));
+    points.push(C::from_xy(min.x() + width / two, max.y() + height));
 
     points
 }
@@ -263,7 +278,11 @@ impl<C: Coord> VoronoiDiagram<C> {
     /// Creates a Voronoi diagram, if it exists, for a given set of points.
     ///
     /// Points are represented here as a `(f64, f64)` tuple.
-    pub fn from_tuple(min: &(f64, f64), max: &(f64, f64), coords: &[(f64, f64)]) -> Option<Self> {
+    pub fn from_tuple(
+        min: &(C::F, C::F),
+        max: &(C::F, C::F),
+        coords: &[(C::F, C::F)],
+    ) -> Option<Self> {
         let points: Vec<C> = coords.iter().map(|p| C::from_xy(p.0, p.1)).collect();
 
         let clip_points = vec![
@@ -299,10 +318,9 @@ impl<C: Coord> VoronoiDiagram<C> {
                 let edges = edges_around_point(incoming, delaunay);
                 let triangles = edges.into_iter().map(triangle_of_edge);
                 let polygon: Vec<C> = triangles.into_iter().map(|t| centers[t].clone()).collect();
-
                 let polygon = polygon::Polygon::from_points(polygon);
 
-                polygon::sutherland_hodgman(&polygon, clip_polygon)
+                polygon::sutherland_hodgman::<C::F, C>(&polygon, clip_polygon)
             })
             .collect()
     }
@@ -312,14 +330,20 @@ fn calculate_centroids<C: Coord>(points: &[C], delaunay: &Triangulation) -> Vec<
     let num_triangles = delaunay.len();
     let mut centroids = Vec::with_capacity(num_triangles);
     for t in 0..num_triangles {
-        let mut sum = Point { x: 0., y: 0. };
+        let mut sum: Point<C::F> = Point {
+            x: C::F::zero(),
+            y: C::F::zero(),
+        };
         for i in 0..3 {
             let s = 3 * t + i; // triangle coord index
             let p = &points[delaunay.triangles[s]];
-            sum.x += p.x();
-            sum.y += p.y();
+            sum.x = sum.x + p.x();
+            sum.y = sum.y + p.y();
         }
-        centroids.push(C::from_xy(sum.x / 3., sum.y / 3.));
+        centroids.push(C::from_xy(
+            sum.x / num::cast(3.0).unwrap(),
+            sum.y / num::cast(3.0).unwrap(),
+        ));
     }
     centroids
 }
@@ -340,7 +364,7 @@ fn calculate_circumcenters<C: Coord>(points: &[C], delaunay: &Triangulation) -> 
 
             match circumcenter(triangle_points[0], triangle_points[1], triangle_points[2]) {
                 Some(c) => c,
-                None => C::from_xy(0., 0.),
+                None => C::from_xy(C::F::zero(), C::F::zero()),
             }
         })
         .collect()
