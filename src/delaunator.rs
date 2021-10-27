@@ -54,9 +54,10 @@
 //! [`halfedges`]: ./struct.Triangulation.html#structfield.halfedges
 //! [`hull`]: ./struct.Triangulation.html#structfield.hull
 
-use num::{Float, NumCast, Zero};
+use core::fmt;
+use num::{Float, Zero};
 use rayon::prelude::*;
-use std::{f64, fmt, usize};
+use std::{f64, usize};
 
 /// Defines a comparison epsilon used for floating-point comparisons
 pub const EPSILON: f64 = f64::EPSILON * 2.0;
@@ -102,6 +103,7 @@ pub const INVALID_INDEX: usize = usize::max_value();
 ///
 use std::fmt::Debug;
 
+/// Coordinate trait
 pub trait Coord: Sync + Send + Clone + Debug {
     /// Floating point type for the coordinates
     type F: Float + Sync + Send + Debug;
@@ -154,12 +156,12 @@ fn nearly_equal<F: Float>(a: F, b: F, epsilon: F) -> bool {
 }
 
 /// Test whether two coordinates describe the same point in space
-#[inline]
+/*#[inline]
 fn equals<C: Coord>(p: &C, q: &C) -> bool {
     nearly_equal(p.x(), q.x(), C::F::epsilon()) && nearly_equal(p.y(), q.y(), C::F::epsilon())
     //(p.x() - q.x()).abs() <= (C::F::min_positive_value() * num::cast(2.0).unwrap())
     //    && (p.y() - q.y()).abs() <= (C::F::min_positive_value() * num::cast(2.0).unwrap())
-}
+}*/
 
 #[inline]
 fn equals_with_span<C: Coord>(p: &C, q: &C, span: C::F) -> bool {
@@ -168,7 +170,7 @@ fn equals_with_span<C: Coord>(p: &C, q: &C, span: C::F) -> bool {
     //dist < num::cast(1e-20).unwrap() // dunno about this
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq)]
 /// Represents a point in the 2D space.
 pub struct Point<F: Float + Send + Sync + Debug = f64> {
     /// X coordinate of the point
@@ -195,11 +197,11 @@ impl<F: Float + Send + Sync + Debug> Coord for Point<F> {
     }
 }
 
-/*impl<F: Float + Send + Sync> fmt::Debug for Point<F> {
+impl<F: Float + Send + Sync + Debug> fmt::Debug for Point<F> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "[{}, {}]", self.x(), self.y())
+        write!(f, "[{:?}, {:?}]", self.x(), self.y())
     }
-}*/
+}
 
 impl From<(f64, f64)> for Point<f64> {
     #[inline]
@@ -209,44 +211,47 @@ impl From<(f64, f64)> for Point<f64> {
 }
 
 #[inline]
-fn in_circle<C: Coord>(p: &C, a: &C, b: &C, c: &C) -> bool {
+fn in_circle<C: Coord>(point: &C, vertex_a: &C, vertex_b: &C, vertex_c: &C) -> bool {
     let zero = C::F::zero();
 
-    let d = vector(p, a);
-    let e = vector(p, b);
-    let f = vector(p, c);
+    let vertex_d = vector(point, vertex_a);
+    let vertex_e = vector(point, vertex_b);
+    let vertex_f = vector(point, vertex_c);
 
-    let ap = d.x() * d.x() + d.y() * d.y();
-    let bp = e.x() * e.x() + e.y() * e.y();
-    let cp = f.x() * f.x() + f.y() * f.y();
+    let ap = vertex_d.magnitude2();
+    let bp = vertex_e.magnitude2();
+    let cp = vertex_f.magnitude2();
 
     #[rustfmt::skip]
-    let res = d.x() * (e.y() * cp  - bp  * f.y()) -
-                   d.y() * (e.x() * cp  - bp  * f.x()) +
-                   ap  * (e.x() * f.y() - e.y() * f.x()) ;
+    let res = vertex_d.x() * (vertex_e.y() * cp  - bp  * vertex_f.y()) -
+                    vertex_d.y() * (vertex_e.x() * cp  - bp  * vertex_f.x()) +
+                    ap  * (vertex_e.x() * vertex_f.y() - vertex_e.y() * vertex_f.x()) ;
 
     res < zero
 }
 
 #[rustfmt::skip]
 #[inline]
-fn circumradius<C: Coord>(a: &C, b: &C, c: &C) -> C::F {
+fn circumradius<C: Coord>(vertex_a: &C, vertex_b: &C, vertex_c: &C) -> C::F {
     let zero = C::F::zero();
-    let point5: C::F = num::cast(0.5).unwrap();
 
-    let d = vector(a, b);
-    let e = vector(a, c);
+    let d = vector(vertex_a, vertex_b);
+    let e = vector(vertex_a, vertex_c);
 
     let bl = d.magnitude2();
     let cl = e.magnitude2();
     let det = determinant(&d, &e);
 
-    let x = (e.y() * bl - d.y() * cl) * (point5 / det);
-    let y = (d.x() * cl - e.x() * bl) * (point5 / det);
-
     if (bl != zero) &&
        (cl != zero) &&
        (det != zero) {
+
+        let coeff: C::F = num::cast(0.5).unwrap();
+        let coeff = coeff / det;
+    
+        let x = (e.y() * bl - d.y() * cl) * coeff;
+        let y = (d.x() * cl - e.x() * bl) * coeff;
+
         x * x + y * y
     } else {
         C::F::max_value()
@@ -261,26 +266,28 @@ fn circumradius<C: Coord>(a: &C, b: &C, c: &C) -> C::F {
 /// * `b` - The second vertex of the triangle
 /// * `c` - The third vertex of the triangle
 #[rustfmt::skip]
-pub fn circumcenter<C: Coord>(a: &C, b: &C, c: &C) -> Option<C> {
+pub fn circumcenter<C: Coord>(vertex_a: &C, vertex_b: &C, vertex_c: &C) -> Option<C> {
     let zero = C::F::zero();
-    let point5: C::F = num::cast(0.5).unwrap();
 
-    let d = vector(a, b);
-    let e = vector(a, c);
+    let vertex_d = vector(vertex_a, vertex_b);
+    let vertex_e = vector(vertex_a, vertex_c);
 
-    let bl = d.magnitude2();
-    let cl = e.magnitude2();
-    let det = determinant(&d, &e);
-
-    let x = (e.y() * bl - d.y() * cl) * (point5 / det);
-    let y = (d.x() * cl - e.x() * bl) * (point5 / det);
+    let bl = vertex_d.magnitude2();
+    let cl = vertex_e.magnitude2();
+    let det = determinant(&vertex_d, &vertex_e);
 
     if (bl != zero) &&
        (cl != zero) &&
        (det != zero) {
+        let coeff: C::F = num::cast(0.5).unwrap();
+        let coeff = coeff / det;
+
+        let x = (vertex_e.y() * bl - vertex_d.y() * cl) * coeff;
+        let y = (vertex_d.x() * cl - vertex_e.x() * bl) * coeff;
+
         Some(C::from_xy(
-            a.x() + x,
-            a.y() + y)
+            vertex_a.x() + x,
+            vertex_a.y() + y)
         )
     } else {
         None
@@ -461,6 +468,11 @@ impl Triangulation {
         self.triangles.len() / 3
     }
 
+    /// Returns whether there are no triangles
+    pub fn is_empty(&self) -> bool {
+        self.triangles.is_empty()
+    }
+
     fn legalize<C: Coord>(&mut self, p: usize, points: &[C], hull: &mut Hull<C>) -> usize {
         /* if the pair of triangles doesn't satisfy the Delaunay condition
          * (p1 is inside the circumcircle of [p0, pl, pr]), flip them,
@@ -515,16 +527,16 @@ impl Triangulation {
                 // Edge swapped on the other side of the hull (rare).
                 // Fix the halfedge reference
                 if hbl == INVALID_INDEX {
-                    let mut e = hull.start;
+                    let mut edge = hull.start;
                     loop {
-                        if hull.tri[e] == bl {
-                            hull.tri[e] = a;
+                        if hull.tri[edge] == bl {
+                            hull.tri[edge] = a;
                             break;
                         }
 
-                        e = hull.prev[e];
+                        edge = hull.prev[edge];
 
-                        if e == hull.start {
+                        if edge == hull.start {
                             break;
                         }
                     }
@@ -933,7 +945,7 @@ pub fn triangulate<C: Coord>(points: &[C]) -> Option<Triangulation> {
     let mut triangulation = Triangulation::new(points.len());
     triangulation.add_triangle(i0, i1, i2, INVALID_INDEX, INVALID_INDEX, INVALID_INDEX);
 
-    let mut pp = &C::from_xy(C::F::nan(), C::F::nan());
+    //let mut pp = &C::from_xy(C::F::nan(), C::F::nan());
 
     //eprintln!("iterating points...");
     // go through points based on distance from the center.
@@ -953,7 +965,7 @@ pub fn triangulate<C: Coord>(points: &[C]) -> Option<Triangulation> {
         }
 
         // We don't need to clone here, can just keep track of the last point
-        pp = p; //.clone();
+        //pp = p; //.clone();
 
         //eprintln!("finding visible edge...");
         let (mut e, backwards) = hull.find_visible_edge(p, span, points);

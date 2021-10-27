@@ -84,10 +84,10 @@
 pub mod delaunator;
 pub mod polygon;
 
-use num::{Float, NumCast, Zero};
+use num::{Float, Zero};
 use rayon::prelude::*;
 
-use std::{f64, usize};
+use std::usize;
 
 use crate::delaunator::*;
 use crate::polygon::*;

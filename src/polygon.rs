@@ -17,7 +17,7 @@
 //!
 
 use crate::delaunator::Coord;
-use num::{Float, NumCast, Zero};
+use num::Zero;
 
 /// Represents a polygon.
 pub struct Polygon<C>
