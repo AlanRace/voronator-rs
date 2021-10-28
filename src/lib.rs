@@ -320,7 +320,7 @@ impl<C: Coord> VoronoiDiagram<C> {
                 let polygon: Vec<C> = triangles.into_iter().map(|t| centers[t].clone()).collect();
                 let polygon = polygon::Polygon::from_points(polygon);
 
-                polygon::sutherland_hodgman::<C::F, C>(&polygon, clip_polygon)
+                polygon::sutherland_hodgman::<C>(&polygon, clip_polygon)
             })
             .collect()
     }

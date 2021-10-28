@@ -26,6 +26,7 @@ where
     C: Coord,
 {
     pub(crate) points: Vec<C>,
+    is_clipped: bool,
 }
 
 impl<C> Default for Polygon<C>
@@ -45,17 +46,28 @@ where
 {
     /// Create an empty polygon with no points.
     pub fn new() -> Self {
-        Polygon { points: Vec::new() }
+        Polygon {
+            points: Vec::new(),
+            is_clipped: false,
+        }
     }
 
     /// Create a polygon consisting of the points supplied.
     pub fn from_points(points: Vec<C>) -> Self {
-        Polygon { points }
+        Polygon {
+            points,
+            is_clipped: false,
+        }
     }
 
     /// Return a slice of points representing the polygon.
     pub fn points(&self) -> &[C] {
         &self.points
+    }
+
+    /// Return whether the polygon has been clipped.
+    pub fn is_clipped(&self) -> bool {
+        self.is_clipped
     }
 
     /// Return area of polygon.
@@ -138,7 +150,7 @@ fn intersection<C: Coord>(cp1: &C, cp2: &C, s: &C, e: &C) -> C {
 }
 
 /// Sutherland-Hodgman clipping modified from https://rosettacode.org/wiki/Sutherland-Hodgman_polygon_clipping#C.2B.2B
-pub fn sutherland_hodgman<F, C>(subject: &Polygon<C>, clip: &Polygon<C>) -> Polygon<C>
+pub fn sutherland_hodgman<C>(subject: &Polygon<C>, clip: &Polygon<C>) -> Polygon<C>
 where
     //    F: Float + Sync + Send,
     C: Coord,
@@ -146,7 +158,7 @@ where
     let mut output_polygon = Polygon::new();
     let mut input_polygon = Polygon::new();
 
-    //let mut clipped = false;
+    let mut clipped = false;
     output_polygon.points.clone_from(&subject.points);
 
     let mut new_polygon_size = subject.points.len();
@@ -181,7 +193,7 @@ where
                 output_polygon.points.push(intersection(cp1, cp2, s, e));
                 output_polygon.points.push(e.clone());
 
-                //clipped = true;
+                clipped = true;
                 counter += 1;
                 counter += 1;
 
@@ -190,7 +202,7 @@ where
             // is added to the output list
             } else if inside(s, cp1, cp2) && !inside(e, cp1, cp2) {
                 output_polygon.points.push(intersection(cp1, cp2, s, e));
-                //clipped = true;
+                clipped = true;
                 counter += 1;
 
                 // Case 4: Both vertices are outside
@@ -203,6 +215,8 @@ where
     }
 
     //println!("Clipped? {}", clipped);
+
+    output_polygon.is_clipped = clipped;
 
     output_polygon
 }
